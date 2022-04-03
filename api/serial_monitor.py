@@ -1,7 +1,10 @@
 import glob
 import sys
+import time
 
 from serial import Serial, SerialException
+import multiprocessing
+import threading, queue
 
 def filter_ports(ports):
     return list(filter(lambda port : "usbmodem" in port, ports))
@@ -34,18 +37,31 @@ def list_ports():
     return result
 
 class SerialMonitor:
+
     def __init__(self, port='COM4', noSerial=False):
         self.noSerial = noSerial
-        if not self.noSerial:
-            self.arduino = Serial(port=port, baudrate=9600, timeout=.1)
-            print("Starting monitor")
 
+        self.last_halt = time.time()
+        self.q = queue.Queue()
+        self.port = port
+
+    def worker(self):
+        if not self.noSerial:
+            self.arduino = Serial(port=self.port, baudrate=9600, timeout=.1)
+            print("Starting monitor")
+            while True:
+                print("get")
+                data_raw = self.q.get()
+                print("nbo")
+                self.arduino.write(data_raw)
+                print(f'Finished {data_raw}')
+                self.q.task_done()
 
     def write(self, data):
 
         if not self.noSerial:
             print("REAL Serial: ", data)
-            self.arduino.write(bytes(data, 'utf-8'))
+            self.q.put(bytes(data, 'utf-8'))
         else:
             print("PRETENDING Serial: ", data)
 

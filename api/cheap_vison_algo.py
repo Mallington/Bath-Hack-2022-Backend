@@ -9,20 +9,14 @@ class PersonDestroyer():
     def __init__(self, serial : SerialMonitor, videoNumber : int):
         self.serial_monitor = serial
 
-        self.hog = cv2.HOGDescriptor()
-        self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+        # self.hog = cv2.HOGDescriptor()
+        # self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
 
-        cv2.startWindowThread()
+        self.last_halt = 0
+        self.videoNumber = videoNumber
 
         # open webcam video stream
-        self.cap = cv2.VideoCapture(videoNumber)
 
-        # the output will be written to output.avi
-        self.out = cv2.VideoWriter(
-            'output.avi',
-            cv2.VideoWriter_fourcc(*'MJPG'),
-            15.,
-            (640, 480))
     def __update_turret(self, shift):
         print(shift)
         if abs(shift) < 10:
@@ -36,7 +30,16 @@ class PersonDestroyer():
                 print("left")
                 self.serial_monitor.left()
 
-    def __start(self):
+    def start(self, showImg = False):
+        self.cap = cv2.VideoCapture(self.videoNumber)
+
+        # the output will be written to output.avi
+        self.out = cv2.VideoWriter(
+            'output.avi',
+            cv2.VideoWriter_fourcc(*'MJPG'),
+            15.,
+            (640, 480))
+        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_upperbody.xml')
         while True:
             while (True):
                 # Capture frame-by-frame
@@ -47,13 +50,12 @@ class PersonDestroyer():
                 # using a greyscale picture, also for faster detection
                 gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
 
-                # detect people in the image
-                # returns the bounding boxes for the detected objects
-                boxes, weights = self.hog.detectMultiScale(frame, winStride=(8, 8))
 
-                boxes = np.array([[x, y, x + w, y + h] for (x, y, w, h) in boxes])
+                faces = self.face_cascade.detectMultiScale(gray, 1.2, 3)
+
                 cv2.line(frame, (320, 0), (320, 480), (255, 255, 0), 2)
-                for (xA, yA, xB, yB) in boxes:
+                for (x,y,w,h) in faces:
+                    xA, yA, xB, yB = x, y, x+w, y+h
                     # display the detected boxes in the colour picture
                     cv2.rectangle(frame, (xA, yA), (xB, yB),
                                   (0, 255, 0), 2)
@@ -72,10 +74,21 @@ class PersonDestroyer():
                     self.__update_turret(shift)
                     break
 
-                # Write the output video
-                self.out.write(frame.astype('uint8'))
-                # Display the resulting frame
-                cv2.imshow('frame', frame)
+                if len(faces) ==0:
+                    if time.time() - self.last_halt >10:
+                        self.serial_monitor.stop()
+                        self.last_halt = time.time()
+
+
+                else:
+                    self.last_halt = 0
+                #
+                # # Write the output video
+                # self.out.write(frame.astype('uint8'))
+                # # Display the resulting frame
+                if showImg:
+                    cv2.imshow('frame', frame)
+
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
@@ -86,6 +99,3 @@ class PersonDestroyer():
             # finally, close the window
             cv2.destroyAllWindows()
             cv2.waitKey(1)
-    def start(self):
-        a_thread = threading.Thread(target=self.__start(), args=(1,))
-        a_thread.start()
