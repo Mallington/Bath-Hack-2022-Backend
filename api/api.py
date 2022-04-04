@@ -6,7 +6,7 @@ from serial_monitor import list_ports, SerialMonitor, filter_ports
 from cheap_vison_algo import PersonDestroyer
 
 noSerial = False
-videoNumber =0
+videoNumber =2
 print("Listing possible ports")
 ports = filter_ports(list_ports())
 print(ports)
@@ -49,7 +49,7 @@ def get_current_time():
 def search():
     print("Firing")
     serialMonitor.fire()
-    time.sleep(1)
+    time.sleep(1.5)
     serialMonitor.stop_firing()
 
     return "I have fired"
